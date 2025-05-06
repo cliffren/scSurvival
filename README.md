@@ -1,2 +1,2 @@
 # scSurvival
-scSurvival is a new tool for survival analysis from single cell cohort dataset.
+scSurvival is a new, scalable, and interpretable tool for modeling survival outcomes from single-cell cohort data, with cellular-resolution risk profiling.
