@@ -124,8 +124,8 @@ class scSurvival(nn.Module):
             gamma_beta_weight=(0.1, 0.0), 
             once_load_to_gpu=True,
             use_amp=False,
-            fitnetune_strategy='jointly',
-            sample_balance=False, # sample b
+            fitnetune_strategy='alternating_lightly',
+            sample_balance=False, 
             **kwargs):
         
         '''
