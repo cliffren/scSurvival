@@ -8,14 +8,14 @@ scSurvival is a new, scalable, and interpretable tool for modeling survival outc
 </p>
 
 ## News 
-* May, 2025: scSurvival version 1.0.2 is launched. It now supports joint analysis incorporating patient covariates.
-* April, 2025: scSurvival version 1.0.1 is launched. It has added support for handling batch effects in single-cell data.
+* May, 2025: scSurvival version 1.2.0 is launched. It now supports joint analysis incorporating patient covariates.
+* April, 2025: scSurvival version 1.1.0 is launched. It has added support for handling batch effects in single-cell data.
 * March, 2025: scSurvival version 1.0.0 is launched.
 
 
 ## System Requirements
 ### Hardware requirements
-`scSurvival` The `scSurvival` package is based on the deep learning framework Pytorch. Therefore, it is best to use scSurvival on a standard computer with a GPU that has enough VRAM.
+`scSurvival` package is based on the deep learning framework Pytorch. Therefore, it is best to use scSurvival on a standard computer with a GPU that has enough VRAM.
 
 The following runtimes are generated using a computer with 64GB RAM, 24 cores @ up to 5.6 GHz CPU, RTX4090 Laptop GPU (16GB VRAM).
 
@@ -48,8 +48,10 @@ You can also install the dependency packages manually, especially for the **GPU*
 
 ## Quick start in python
 ```python
-from scSurvival_beta import scSurvivalRun, PredictIndSample
+from scSurvival import scSurvivalRun, PredictIndSample
 import scanpy as sc
+import numpy as np
+import pandas as pd
 
 # prepare data source
 ## single data cohort
@@ -91,6 +93,7 @@ adata, surv, model = scSurvivalRun(
     fitnetune_strategy='jointly'# jointly | alternating | alternating_lightly
     )
 
+## visualization of results
 sc.pl.umap(adata, color=['attention'], vmin=0, vmax=1, cmap='coolwarm')
 sc.pl.umap(adata_new, color=['hazard_adj'], cmap='coolwarm', vmin=-10, vmax=10)
 
@@ -106,12 +109,12 @@ adata_new, patient_hazard = PredictIndSample(
 
 ## Examples & Tutorials
 Using two simulation examples, we demonstrate how to execute scSurvival analysis. <br>
-The generation of the two simulated datasets was done in R. If you work in R, you can start directly here:
+The two simulated datasets were generated in R. If you work in R, you can start directly here:
 
-+ [scSurvival Tutorial in R](https://cliffren.github.io/PENCIL/examples/PENCIL_Tutorial_in_R.html)
++ [scSurvival Tutorial in R](https://cliffren.github.io/scSurvival/examples/scSurvival_Tutorial_in_R.html)
 
 If you prefer to run scSurvial directly in python, you can also download our simulation data and start here, 
-+ [scSurvival Tutorial in Python](https://github.com/cliffren/PENCIL/blob/main/examples/PENCIL_Tutorial_in_Python.ipynb)
++ [scSurvival Tutorial in Python](https://github.com/cliffren/scSurvival/blob/main/example/scSurvival_Tutorial_in_Python.ipynb)
 
 The R tutorial or python tutorial would take about 5 minutes on the test computer using GPU (58 minutes using CPU only). 
 
@@ -120,9 +123,8 @@ Please cite the following manuscript:
 >xxxx. https://doi.org/xxx. <br>
 Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia
 
-
 ## License
 scSurvival is licensed under the GNU General Public License v3.0. <br>
-scSurvival will be updated frequently with new features and improvements. If you have any questions, please submit them on the [GitHub issues page](https://github.com/cliffren/PENCIL/issues) or check the [FAQ](https://cliffren.github.io/PENCIL/examples/FAQ/scSurvival_FAQ.html) list.
+scSurvival will be updated frequently with new features and improvements. If you have any questions, please submit them on the [GitHub issues page](https://github.com/cliffren/scSurvival/issues) or check the [FAQ](https://cliffren.github.io/scSurvival/examples/FAQ/scSurvival_FAQ.html) list.
 
 
