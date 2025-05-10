@@ -17,7 +17,7 @@ scSurvival is a new, scalable, and interpretable tool for modeling survival outc
 ### Hardware requirements
 `scSurvival` package is based on the deep learning framework Pytorch. Therefore, it is best to use scSurvival on a standard computer with a GPU that has enough VRAM.
 
-The following runtimes are generated using a computer with 64GB RAM, 24 cores @ up to 5.6 GHz CPU, RTX4090 Laptop GPU (16GB VRAM).
+The following runs are generated using a computer with 64GB RAM, 24 cores @ up to 5.6 GHz CPU, RTX4090 Laptop GPU (16GB VRAM).
 
 ### Software requirements
 #### OS Requirements
