@@ -114,7 +114,7 @@ The two simulated datasets were generated in R. If you work in R, you can start 
 + [scSurvival Tutorial in R](https://cliffren.github.io/scSurvival/examples/scSurvival_Tutorial_in_R.html)
 
 If you prefer to run scSurvial directly in python, you can also download our simulation data and start here, 
-+ [scSurvival Tutorial in Python](https://github.com/cliffren/scSurvival/blob/main/example/scSurvival_Tutorial_in_Python.ipynb)
++ [scSurvival Tutorial in Python](https://github.com/cliffren/scSurvival/blob/main/examples/scSurvival_Tutorial_in_Python.ipynb)
 
 The R tutorial or python tutorial would take about 5 minutes on the test computer using GPU (58 minutes using CPU only). 
 
