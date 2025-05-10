@@ -120,7 +120,8 @@ The R tutorial or python tutorial would take about 5 minutes on the test compute
 
 ## How to Cite scSurvival
 Please cite the following manuscript:
->xxxx. https://doi.org/xxx. <br>
+
+>scSurvial: survival analysis from single-cell cohort data at cellular resolution. https://doi.org/xxx. <br>
 Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia
 
 ## License
