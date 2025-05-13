@@ -698,10 +698,9 @@ When batch effects exist either within the training data or between the training
 To address this issue, we recommend combining the test data (along with their batch labels) with the training data and re-training the model using the scSurvivalRun function. This enables transfer learning by jointly learning from both datasets. Upon completion, scSurvivalRun will return an updated adata object and a surv DataFrame that include prediction results for the test data.
 
 
-# Reference
-scSurvial: survival analysis from single-cell cohort data at cellular resolution.
-
-Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia
+# # Reference
+# scSurvial: survival analysis from single-cell cohort data at cellular resolution.
+# Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia
 
 # Package versions
 R packages loaded in this tutorial: <br>
