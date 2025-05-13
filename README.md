@@ -4,7 +4,7 @@
 scSurvival is a new, scalable, and interpretable tool for modeling survival outcomes from single-cell cohort data, with cellular-resolution risk profiling. It first employs a feature extraction module based on a variational autoencoder and generative modeling to learn batch-invariant single-cell representations, and then aggregates cell-level features to the patient level to perform multi-head attention-based multiple instance Cox regression. scSurvival not only enables the integration of single-cell expression data with patient-level clinical variables to build accurate survival risk prediction models, but also identifies key cell subpopulations most associated with survival risk and characterizes their risk tendencies, thereby facilitating more refined downstream analyses. The framework of scSurvival is depicted in the following figure:
 
 <p align="center">
-  <img src="./pics/scSurvival_framework.jpg" width = "1000" alt="method" align=center />
+  <img src="./pics/scSurvival_framework_v2.jpg" width = "1000" alt="method" align=center />
 </p>
 
 ## News 
