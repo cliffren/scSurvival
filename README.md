@@ -116,11 +116,13 @@ The two simulated datasets were generated in R. If you work in R, you can start 
 If you prefer to run scSurvial directly in python, you can also download our simulation data and start here, 
 + [scSurvival Tutorial in Python](https://github.com/cliffren/scSurvival/blob/main/examples/scSurvival_Tutorial_in_Python.ipynb)
 
+<!-- 这是一个注释，不会出现在渲染后的页面中 
 ## How to Cite scSurvival
 Please cite the following manuscript:
 
 >scSurvial: survival analysis from single-cell cohort data at cellular resolution.  <br>
 Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia
+-->
 
 ## License
 scSurvival is licensed under the GNU General Public License v3.0. <br>
