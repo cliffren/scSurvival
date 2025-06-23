@@ -17,7 +17,7 @@ setup(
         'torch',
         'pandas',
         'scanpy',
-        'sklearn',
+        'scikit-learn',
         'lifelines'
     ],
     zip_safe=False,
