@@ -187,7 +187,8 @@ class scSurvival(nn.Module):
                 covariates_encoded_test = covariates_encoded.iloc[test_idx]
                 covariates_encoded = covariates_encoded_train
 
-
+        if self.device.type == 'cpu':
+            once_load_to_gpu = False
         if once_load_to_gpu:
             xs = [torch.tensor(x, dtype=torch.float32, device=self.device) for x in xs]
         else:
