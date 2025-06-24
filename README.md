@@ -95,7 +95,7 @@ adata, surv, model = scSurvivalRun(
 
 ## visualization of results
 sc.pl.umap(adata, color=['attention'], vmin=0, vmax=1, cmap='coolwarm')
-sc.pl.umap(adata_new, color=['hazard_adj'], cmap='coolwarm', vmin=-10, vmax=10)
+sc.pl.umap(adata, color=['hazard_adj'], cmap='coolwarm', vmin=-10, vmax=10)
 
 # Predict on an independent sample
 ## For direct prediction, batch cannot be included in the training. If there is a batch effect, transfer learning can be performed by putting the test samples into adata for joint training.
