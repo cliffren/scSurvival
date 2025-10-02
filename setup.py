@@ -10,7 +10,7 @@ setup(
     author='Tao Ren',
     author_email='renta@ohsu.edu', 
     url='https://github.com/cliffren/scSurvival', 
-    packages=setuptools.find_packages(exclude=['*bak', 'example', 'pics', 'libs']),  # 包内不需要引⽤的⽂件夹
+    packages=setuptools.find_packages(exclude=['*bak', 'example', 'pics', 'libs', 'other_scripts']),  # 包内不需要引⽤的⽂件夹
     # 依赖包
     install_requires=[
         'numpy',
