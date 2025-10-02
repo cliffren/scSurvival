@@ -4,10 +4,12 @@
 scSurvival is a new, scalable, and interpretable tool for modeling survival outcomes from single-cell cohort data, with cellular-resolution risk profiling. It first employs a feature extraction module based on a variational autoencoder and generative modeling to learn batch-invariant single-cell representations, and then aggregates cell-level features to the patient level to perform multi-head attention-based multiple instance Cox regression. scSurvival not only enables the integration of single-cell expression data with patient-level clinical variables to build accurate survival risk prediction models, but also identifies key cell subpopulations most associated with survival risk and characterizes their risk tendencies, thereby facilitating more refined downstream analyses. The framework of scSurvival is depicted in the following figure:
 
 <p align="center">
-  <img src="./pics/scSurvival_framework_v2.jpg" width = "1000" alt="method" align=center />
+  <img src="./pics/scSurvival_framework.jpg" width = "1000" alt="method" align=center />
 </p>
 
 ## News 
+*  Oct, 2025: Several scripts for generating simulated datasets have been added to the codebase.
+* Sep, 2025: scSurvival version 1.3.0 is launched. It now supports inputting any user-defined features for multi-instance Cox regression analysis.
 * May, 2025: scSurvival version 1.2.0 is launched. It now supports joint analysis incorporating patient covariates.
 * April, 2025: scSurvival version 1.1.0 is launched. It has added support for handling batch effects in single-cell data.
 * March, 2025: scSurvival version 1.0.0 is launched.
@@ -95,7 +97,7 @@ adata, surv, model = scSurvivalRun(
 
 ## visualization of results
 sc.pl.umap(adata, color=['attention'], vmin=0, vmax=1, cmap='coolwarm')
-sc.pl.umap(adata, color=['hazard_adj'], cmap='coolwarm', vmin=-10, vmax=10)
+sc.pl.umap(adata_new, color=['hazard_adj'], cmap='coolwarm', vmin=-10, vmax=10)
 
 # Predict on an independent sample
 ## For direct prediction, batch cannot be included in the training. If there is a batch effect, transfer learning can be performed by putting the test samples into adata for joint training.
@@ -116,13 +118,11 @@ The two simulated datasets were generated in R. If you work in R, you can start 
 If you prefer to run scSurvial directly in python, you can also download our simulation data and start here, 
 + [scSurvival Tutorial in Python](https://github.com/cliffren/scSurvival/blob/main/examples/scSurvival_Tutorial_in_Python.ipynb)
 
-<!-- 这是一个注释，不会出现在渲染后的页面中 
 ## How to Cite scSurvival
 Please cite the following manuscript:
 
 >scSurvial: survival analysis from single-cell cohort data at cellular resolution.  <br>
 Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia
--->
 
 ## License
 scSurvival is licensed under the GNU General Public License v3.0. <br>
