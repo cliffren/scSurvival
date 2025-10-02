@@ -23,7 +23,7 @@ def calc_gene_weights(exp, alpha=0.2, eps=1e-6):
     w = w / np.mean(w)
     return w
 
-def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, feature_flavor='AE', beta=0.1, tau=0.2, hidden_size=128, num_heads=8, rec_likelihood='ZIG', do_scale_ae=False, gene_weight_alpha=0.2, model_save_dir=None, model_load_dir=None, dropout=0.5, **kwargs):
+def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, feature_flavor='AE', beta=0.1, tau=0.2, hidden_size=128, num_heads=8, rec_likelihood='ZIG', do_scale_ae=False, gene_weight_alpha=0.2, model_save_dir=None, model_load_dir=None, dropout=0.5, predict_nMC=64, feature_key=None, **kwargs):
     '''
     Parameters
     ----------
@@ -34,9 +34,10 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
     covariates: covariates for survival analysis, such as age, gender, etc.
         The covariates should be a DataFrame with index as sample_column, and columns as covariates.
     batch_key(optional): batch key in adata.obs
-    feature_flavor: 'PCA' or 'AE'. 
+    feature_flavor: 'PCA' , 'AE' or 'Custom'. 
         PCA: use PCA as feature. If batch_key is not None, use harmony corrected PCA. If pca key is not in adata.obsm, PCA is performed automatically first.
         AE: Jointly train model with an autoencoder to extract features. Only support batch_key=None. Next steps may be added to support batch_key using the VAE like scVI. 
+        Custom: use custom features in adata.obsm[feature_key]. feature_key is required.
     beta: beta parameter for KLD loss in variational autoencoder.
     tau: tau freebits parameter for KLD loss in variational autoencoder.
     hidden_size: hidden size of the model.
@@ -47,7 +48,10 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
     model_save_dir: directory to save the model.
     model_load_dir: directory to load the model.
     dropout: dropout rate for the hazard model.
+    predict_nMC: number of Monte Carlo samples for prediction. Only used when `sample_balance` is True in training.
+    feature_key: key in adata.obsm for custom features. Required when feature_flavor is 'Custom'.
     kwargs: other parameters for scSurvival.fit().
+    
 
     Returns
     -------
@@ -75,6 +79,9 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
     y_time = surv['time'].values
     y_event = surv['status'].values
 
+    # initialize batch lists
+    batch_lists = None
+
     if covariates is not None:
         cov_psr = CovPreprocessor()
         covariates_encoded = cov_psr.fit_transform(covariates.loc[patients_with_surv, :])
@@ -84,7 +91,38 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
         covariate_size = None
         covariates_encoded = None
 
-    if feature_flavor == 'PCA':
+    if feature_flavor == 'Custom':
+        assert feature_key is not None, 'feature_key is required for Custom feature_flavor.'
+        assert feature_key in adata.obsm.keys(), 'feature_key %s not in adata.obsm' % feature_key
+        xs = [adata[adata.obs[sample_column] == each].obsm[feature_key] for each in patients]
+        input_size = xs[0].shape[1] 
+        model = scSurvival(input_size, 
+                           hidden_size=input_size, 
+                           num_heads=num_heads, 
+                           extract_feature=False, 
+                           dropout=dropout, 
+                           covariate_size=covariate_size)
+        
+        if 'entropy_threshold' not in kwargs:
+            kwargs['entropy_threshold'] = 0.5
+        if model_load_dir is not None:
+            model.load_state_dict(torch.load(os.path.join(model_load_dir, 'model.pt'), map_location=model.device, weight_only=True))
+            print('Model loaded from %s' % model_load_dir)
+        model.fit(xs, 
+                  y_time, 
+                  y_event, 
+                  covariates_encoded=covariates_encoded,
+                #   epochs=500, 
+                #   instance_batch_size=3000, 
+                #   lambdas=(0.0, 1.0),
+                #   entropy_threshold=0.5, 
+                  **kwargs)
+        _, a, cell_hazards, cell_hazards_weighted = model.predict_cells(adata.obsm[feature_key])
+
+        model.feature_key = feature_key
+        batch_lists = None
+
+    elif feature_flavor == 'PCA':
         pca_key = None
         if batch_key is None:
             if 'X_pca' not in adata.obsm.keys():
@@ -127,7 +165,8 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
                   **kwargs)
         
         _, a, cell_hazards, cell_hazards_weighted = model.predict_cells(adata.obsm[pca_key])
-        
+
+        batch_lists = None
     elif feature_flavor == 'AE':
         # assert batch_key is None, 'Only support PCA for batch correction'
         # sc.pp.scale(adata, max_value=10)
@@ -205,7 +244,11 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
             non_zero_vars = []
             for i in range(exp.shape[1]):
                 tmp_x = exp[:, i]
-                non_zero_var = np.var(tmp_x[tmp_x > 0])
+                tmp_check = tmp_x > 0
+                if tmp_check.max():
+                    non_zero_var = np.var(tmp_x[tmp_x > 0])
+                else:
+                    non_zero_var = 0.0
                 non_zero_vars.append(non_zero_var)
             model.cell_model.feature_extractor.recon_logvar.copy_(torch.tensor(non_zero_vars).float().to(model.device)) 
             model.cell_model.feature_extractor.recon_logvar.requires_grad = True
@@ -231,7 +274,11 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
 
     print('Added hazard and attention to adata.obs.')
 
-    patient_hazards = model.predict_samples(xs, batch_lists=batch_lists, covariates_encoded=covariates_encoded).view(-1).cpu().detach().numpy()
+    patient_hazards = model.predict_samples(xs, 
+                                            batch_lists=batch_lists, 
+                                            covariates_encoded=covariates_encoded,
+                                            n_MC=predict_nMC
+                                            ).view(-1).cpu().detach().numpy()
     surv['patient_hazards'] = patient_hazards[0:len(patients_with_surv)]
 
     if len(patients_wo_surv) > 0:
@@ -244,6 +291,8 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
 
     model.feature_flavor = feature_flavor
     model.cov_processor = cov_psr
+    if model.use_batch:
+        model.batch_key = batch_key
 
     if model_save_dir is not None:
         if not os.path.exists(model_save_dir):
@@ -253,7 +302,13 @@ def scSurvivalRun(adata, sample_column, surv, covariates=None, batch_key=None, f
 
     return adata, surv, model
 
-def PredictIndSample(adata_new, adata=None, model=None, adata_genes=None, covariates_new=None):
+def PredictIndSample(adata_new, adata=None, model=None, adata_genes=None, covariates_new=None, n_MC=64):
+    '''
+    Predict individual sample hazards using the trained model.
+    Parameters
+    ----------
+    n_MC: number of Monte Carlo samples for prediction. only when `sample_balance` is True in training.
+    '''
     if adata is None:
         assert model.feature_flavor == 'AE', 'adata is required for PCA feature flavor.'
         assert adata_genes is not None, 'adata_genes is required for AE feature flavor if adata is None.'
@@ -262,7 +317,19 @@ def PredictIndSample(adata_new, adata=None, model=None, adata_genes=None, covari
         adata_genes = adata.var_names
 
     # adata_new: AnnData object with normalized expression data
-    assert model.use_batch == False, 'predicting individual sample is not supported for batch correction. Try to train a model jointly with the new sample.'
+    # assert model.use_batch == False, 'predicting individual sample is not supported for batch correction. Try to train a model jointly with the new sample.'
+
+    if model.use_batch:
+        assert model.feature_flavor == 'AE', 'Only support AE feature flavor for batch correction automatically.'
+        
+        assert model.batch_key in adata_new.obs.columns, 'batch_key %s not in adata_new.obs' % model.batch_key
+        try:
+            batches = model.le.transform(adata_new.obs[model.batch_key].values)
+        except:
+            print('Predicting individual sample is not supported for batch correction. Try to train a model jointly with the new sample.')
+            raise ValueError('The batch labels in adata_new.obs[%s] do not match those in training data.' % model.batch_key)
+    else:
+        batches = None
 
     feature_flavor = model.feature_flavor
     missing_genes = list(set(adata_genes) - set(adata_new.var_names))
@@ -289,33 +356,46 @@ def PredictIndSample(adata_new, adata=None, model=None, adata_genes=None, covari
         covariates_new_encoded = model.cov_processor.transform(covariates_new)
     else:
         covariates_new_encoded = None
+    if feature_flavor == 'Custom':
+        exp_custom = adata_new.obsm[model.feature_key]
+        _, a, cell_hazards, cell_hazards_weighted = model.predict_cells(exp_custom, batch_labels=batches)
+        patient_hazards = model.predict_samples(
+            [exp_custom], 
+            batch_lists=None,
+            covariates_encoded=covariates_new_encoded
+            ).view(-1).cpu().detach().numpy()
 
-    if feature_flavor == 'PCA':
+    elif feature_flavor == 'PCA':
         if 'X_pca_trans' in adata_new.obsm.keys():
             exp_pca = adata_new.obsm['X_pca_trans']
         else:
             exp_pca = exp @ adata.varm['PCs']
 
-        _, a, cell_hazards, cell_hazards_weighted = model.predict_cells(exp_pca)
+        _, a, cell_hazards, cell_hazards_weighted = model.predict_cells(exp_pca, batch_labels=batches)
         patient_hazards = model.predict_samples(
             [exp_pca], 
+            batch_lists=None,
             covariates_encoded=covariates_new_encoded
             ).view(-1).cpu().detach().numpy()
+        
     elif feature_flavor == 'AE':
         # exp_scaled = exp
         if model.scaler is not None:
             exp = model.scaler.transform(exp)
-        h, a, cell_hazards, cell_hazards_weighted = model.predict_cells(exp)
+        h, a, cell_hazards, cell_hazards_weighted = model.predict_cells(exp, batch_labels=batches)
         patient_hazards = model.predict_samples(
             [exp], 
-            covariates_encoded=covariates_new_encoded
+            batch_lists=[batches] if batches is not None else None,
+            covariates_encoded=covariates_new_encoded,
+            n_MC=n_MC
             ).view(-1).cpu().detach().numpy()
+        
+        adata_new.obsm['X_ae'] = h.cpu().detach().numpy()
 
     adata_new.obs['hazard'] = cell_hazards.cpu().detach().numpy()
     adata_new.obs['attention'] = a.cpu().detach().numpy()
     adata_new.obs['hazard_adj'] = cell_hazards_weighted.cpu().detach().numpy()
-    adata_new.obsm['X_ae'] = h.cpu().detach().numpy()
-
+    
     print('Added hazard and attention to adata_new.obs.')
     return adata_new, patient_hazards[0]
 

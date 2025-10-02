@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
-import math
+# import math
 
 def cox_loss_func(pred, label):
     '''
@@ -18,7 +18,7 @@ def cox_loss_func(pred, label):
     n_observed = label.sum(0)
     sum_diff_in_observed = torch.transpose(diff, 0, 1).mm(label)
     loss = (-(sum_diff_in_observed / n_observed)).view(-1)
-        
+
     return loss
 
 def R_set(x):
@@ -39,7 +39,7 @@ def zero_inflated_gaussian_loss(x, recon_x, recon_logvar, recon_pi, eps=1e-8, re
         gamma_prior = lambda var: -gamma_dist.log_prob(var.clamp(min=1e-6))
     if beta_dist is not None:
         beta_prior = lambda pi: -beta_dist.log_prob(pi.clamp(min=1e-2, max=1-1e-2))
-    
+
     var = torch.exp(recon_logvar) + eps
     gamma_weight, beta_weight = gamma_beta_weight
     

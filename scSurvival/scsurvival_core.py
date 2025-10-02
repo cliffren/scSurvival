@@ -13,14 +13,15 @@ from copy import deepcopy
 from torch.utils.data import DataLoader, TensorDataset
 from torch.amp import GradScaler, autocast
 from contextlib import nullcontext
-from .utils import GPUDataLoader
+from .utils import *
 from sklearn.model_selection import train_test_split
 from collections import deque
 
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-import joblib
+# import joblib
 import pandas as pd
+from lifelines import CoxPHFitter
 
 def setup_seed(seed):
     """ Set the random state."""
@@ -57,6 +58,8 @@ class scSurvival(nn.Module):
             self.projecters.to(self.device)
 
         self.extract_feature = extract_feature
+
+        self.sample_size = None
 
     def pretrain_epoch(self, all_dataloader, feature_weights, gamma_beta_weight,  scaler, amp_context, use_amp, optimizer, lamda=1.0, num_iter=None, train=True):
         ae_loss = 0.0
@@ -109,8 +112,9 @@ class scSurvival(nn.Module):
             covariates_encoded=None,
             batch_lists=None, 
             validate=False,
-            validate_ratio=0.3,
+            validate_ratio=0.2,
             validate_metric='ccindex', 
+            validate_nMC=6,
             feature_weights=None, 
             epochs=500, pretrain_epochs=200, lr=0.001, 
             pretrain_batch_size=None,
@@ -132,12 +136,14 @@ class scSurvival(nn.Module):
         Parameters
         ----------
         xs: list of expression matrices, each matrix represents a single-cell RNA-seq data.
-        y_event: tensor, event indicator.
+        y_time: array of survival times.
+        y_event: array of event indicators.
         covariates_encoded: tensor, covariates encoded by dummy variables.
         batch_lists: list of batch indices, each one represents the batch labels of a single-cell RNA-seq data.
-        validate: bool, whether to perform validation during training. If True, will split 20% of the data for validation.
-        validate_ratio: float, the ratio of data to use for validation when `validate` is True. Default is 0.2 (20%).
+        validate: bool, whether to perform validation during training. If True, will split `validate_ratio` of the data for validation. When used to train predictive models, turning on validation set monitoring can control model overfitting and get more robust predictive model.
+        validate_ratio: float, the ratio of data to use for validation when `validate` is True. Default is 0.3 (30%).
         validate_metric: str, 'ccindex' or 'cindex', the metric to use for validation when `validate` is True. Default is 'ccindex'.
+        validate_nMC: int, the number of Monte Carlo samples to use for validation when `validate` is True and sample_balance is True. Default is 20.
         feature_weights: 1D array, feature weights for the reconstruction loss in the autoencoder.
         epochs: int, number of epochs for training.
         pretrain_epochs: int, number of epochs for pretraining the autoencoder.
@@ -168,7 +174,13 @@ class scSurvival(nn.Module):
         # setup_seed(42)
         if validate:
             print(f'Validation mode is enabled, will split {int(validate_ratio * 100)}% of the data for validation.')
-            train_idx, test_idx = train_test_split(range(len(xs)), test_size=validate_ratio, random_state=42, stratify=y_event, shuffle=True)
+            # straitify_labels = make_strata_labels(y_time, y_event, n_time_bins=2)
+            straitify_labels = y_event
+            try:
+                train_idx, test_idx = train_test_split(range(len(xs)), test_size=validate_ratio, random_state=42, stratify=straitify_labels, shuffle=True)
+            except:
+                train_idx, test_idx = train_test_split(range(len(xs)), test_size=validate_ratio, random_state=42, shuffle=True)
+                
             xs_train = [xs[i] for i in train_idx]
             xs_test = [xs[i] for i in test_idx]
             y_time_train = y_time[train_idx]
@@ -187,8 +199,7 @@ class scSurvival(nn.Module):
                 covariates_encoded_test = covariates_encoded.iloc[test_idx]
                 covariates_encoded = covariates_encoded_train
 
-        if self.device.type == 'cpu':
-            once_load_to_gpu = False
+
         if once_load_to_gpu:
             xs = [torch.tensor(x, dtype=torch.float32, device=self.device) for x in xs]
         else:
@@ -260,6 +271,10 @@ class scSurvival(nn.Module):
             sample_size = int(x_all.shape[0] / len(xs))
             instance_batch_size = sample_size
 
+            self.sample_size = sample_size
+            if validate_nMC > 0:
+                print(f'Sample balance is enabled, and the Monte Carlo predict mode will be activated.')
+
         if pretrain_batch_size is None:
             pretrain_batch_size = instance_batch_size
 
@@ -280,7 +295,7 @@ class scSurvival(nn.Module):
                     all_dataloader = DataLoader(all_dataset, batch_size=pretrain_batch_size, shuffle=True)
             return all_dataloader
 
-        if pretrain_epochs > 0:
+        if pretrain_epochs > 0 and self.extract_feature:
             progress = tqdm(range(pretrain_epochs), desc='Pretraining', leave=True)
 
             all_dataloader = get_dataloader(self)
@@ -293,7 +308,7 @@ class scSurvival(nn.Module):
         recent_metrics = deque(maxlen=5)
         best_model = None 
         patience_count = 0
-        if pretrain_epochs > 0:
+        if pretrain_epochs > 0 and self.extract_feature:
             progress = tqdm(range(epochs), desc='Finetuning', leave=True)
             for module in self.modules():
                 if isinstance(module, nn.BatchNorm1d):
@@ -316,7 +331,11 @@ class scSurvival(nn.Module):
             elif fitnetune_strategy == 'alternating_lightly':
                 train = True
                 num_iter = 1
-            ae_loss = self.pretrain_epoch(all_dataloader, feature_weights, gamma_beta_weight, scaler, amp_context, use_amp, self.optimizer, lamda=lambdas[0], num_iter=num_iter, train=train)  # jointly train autoencoder
+            
+            if self.extract_feature:
+                ae_loss = self.pretrain_epoch(all_dataloader, feature_weights, gamma_beta_weight, scaler, amp_context, use_amp, self.optimizer, lamda=lambdas[0], num_iter=num_iter, train=train)  # jointly train autoencoder
+            else:
+                ae_loss = 0.0
 
             # phase 2
             self.optimizer.zero_grad()
@@ -421,7 +440,8 @@ class scSurvival(nn.Module):
                         xs=xs_test, 
                         instance_batch_size=instance_batch_size, 
                         batch_lists=batch_lists_test if self.use_batch else None,
-                        covariates_encoded=covariates_encoded_test if covariates_encoded is not None else None
+                        covariates_encoded=covariates_encoded_test if covariates_encoded is not None else None,
+                        n_MC=validate_nMC
                         )
                     if validate_metric == 'cindex':
                         # directly use cindex on the test set hazards
@@ -546,7 +566,6 @@ class scSurvival(nn.Module):
             hazards_base = self.hazard_model(h_alls).detach()
             covariates_encoded_features = list(covariates_encoded_features)
 
-            from lifelines import CoxPHFitter
             cph = CoxPHFitter(penalizer=0.1)
 
             df = pd.DataFrame(
@@ -632,7 +651,7 @@ class scSurvival(nn.Module):
         cell_hazards_weighted = torch.cat(cell_hazard_weighted_alls, dim=0)
         return h, a, cell_hazards, cell_hazards_weighted
     
-    def predict_samples(self, xs, instance_batch_size=None, batch_lists=None, covariates_encoded=None):
+    def predict_samples(self, xs, instance_batch_size=None, batch_lists=None, covariates_encoded=None, n_MC=64):
         # xs should be a list of tensors representing single-cell RNA-seq data
         max_len = max([x.shape[0] for x in xs])
         if instance_batch_size is None:
@@ -646,43 +665,70 @@ class scSurvival(nn.Module):
             covariates_encoded = torch.tensor(covariates_encoded.values, dtype=torch.float32)
             covariates_encoded = covariates_encoded.to(self.device)
 
-        with torch.no_grad():
-            self.eval()
-            hazards = []
-            h_alls = []
-            for i, x in enumerate(xs):
-                hs, attens = [], []
-                x = torch.tensor(x, dtype=torch.float32)
-                for j in range(0, len(x), instance_batch_size):
-                    to_idx = min(j+instance_batch_size, x.shape[0])
-                    instance_batch = x[j:to_idx].to(self.device)
-                    if batch_lists is not None:
-                        batch_labels = batch_lists[i][j:to_idx].to(self.device)
-                        h, a, _ = self.cell_model(instance_batch, batch_embed=batch_labels, disable_decoder=True)
-                    else:
-                        h, a, _ = self.cell_model(instance_batch, disable_decoder=True)
-                    hs.append(h)
-                    attens.append(a)
-
-                hs = torch.cat(hs, dim=0)
-                attens = torch.cat(attens, dim=0)
-                attens = F.softmax(attens, dim=0)
-
-                if self.num_heads is not None:
-                    h_all = [torch.sum(p(hs) * attens[:, i].view(-1, 1), dim=0) for i, p in enumerate(self.projecters)]
-                    h_all = torch.cat(h_all, dim=0)
-                else:
-                    h_all = torch.sum(hs * attens, dim=0)
-
-                # hazard = self.hazard_model(h_all)
-                # hazards.append(hazard)
-                h_alls.append(h_all)
-
-            # hazards = torch.cat(hazards, dim=0).view(-1)
-            h_alls = torch.cat(h_alls, dim=0).view(-1, h_alls[0].shape[0])
-            hazards = self.hazard_model(h_alls, covariates=covariates_encoded) if covariates_encoded is not None else self.hazard_model(h_alls)
         
-        return hazards
+        def infer(xs, instance_batch_size):
+            with torch.no_grad():
+                self.eval()
+                hazards = []
+                h_alls = []
+                for i, x in enumerate(xs):
+                    hs, attens = [], []
+                    x = torch.tensor(x, dtype=torch.float32)
+                    for j in range(0, len(x), instance_batch_size):
+                        to_idx = min(j+instance_batch_size, x.shape[0])
+                        instance_batch = x[j:to_idx].to(self.device)
+                        if batch_lists is not None:
+                            batch_labels = batch_lists[i][j:to_idx].to(self.device)
+                            h, a, _ = self.cell_model(instance_batch, batch_embed=batch_labels, disable_decoder=True)
+                        else:
+                            h, a, _ = self.cell_model(instance_batch, disable_decoder=True)
+                        hs.append(h)
+                        attens.append(a)
+
+                    hs = torch.cat(hs, dim=0)
+                    attens = torch.cat(attens, dim=0)
+                    attens = F.softmax(attens, dim=0)
+
+                    if self.num_heads is not None:
+                        h_all = [torch.sum(p(hs) * attens[:, i].view(-1, 1), dim=0) for i, p in enumerate(self.projecters)]
+                        h_all = torch.cat(h_all, dim=0)
+                    else:
+                        h_all = torch.sum(hs * attens, dim=0)
+
+                    # hazard = self.hazard_model(h_all)
+                    # hazards.append(hazard)
+                    h_alls.append(h_all)
+
+                # hazards = torch.cat(hazards, dim=0).view(-1)
+                h_alls = torch.cat(h_alls, dim=0).view(-1, h_alls[0].shape[0])
+                hazards = self.hazard_model(h_alls, covariates=covariates_encoded) if covariates_encoded is not None else self.hazard_model(h_alls)
+
+                return hazards
+        
+        if self.sample_size is not None and n_MC > 0:
+            xs_raw = deepcopy(xs)
+            def sample_x(x):
+                if x.shape[0] < self.sample_size:
+                    sample_indices = random.choices(range(x.shape[0]), k=self.sample_size)
+                else:
+                    sample_indices = random.sample(range(x.shape[0]), self.sample_size)
+            
+                return x[sample_indices]
+            instance_batch_size = self.sample_size
+
+            hazards_final = []
+            for i in range(n_MC):
+                xs = [sample_x(x) for x in xs_raw]
+                hazards = infer(xs, instance_batch_size) # batch_size * 1
+                # print(f'mc: {i}, sample size: {xs[0].shape[0]}, hazards: {hazards.shape}')
+                hazards_final.append(hazards)
+            hazards_final = torch.stack(hazards_final, dim=0) # n_MC * batch_size * 1
+            hazards_final = hazards_final.median(dim=0).values # batch_size * 1
+            return hazards_final
+        
+        else:
+            hazards = infer(xs, instance_batch_size)
+            return hazards
 
 class CovPreprocessor:
     def __init__(self):
@@ -734,10 +780,10 @@ class CovPreprocessor:
         X['event'] = event.astype(int)
         return X
 
-    def save(self, path_prefix='cov_preprocessor'):
-        joblib.dump(self.pipeline, f'{path_prefix}_pipeline.pkl')
-        joblib.dump((self.continuous_cols, self.categorical_cols, self.feature_names), f'{path_prefix}_meta.pkl')
+    # def save(self, path_prefix='cov_preprocessor'):
+    #     joblib.dump(self.pipeline, f'{path_prefix}_pipeline.pkl')
+    #     joblib.dump((self.continuous_cols, self.categorical_cols, self.feature_names), f'{path_prefix}_meta.pkl')
 
-    def load(self, path_prefix='cov_preprocessor'):
-        self.pipeline = joblib.load(f'{path_prefix}_pipeline.pkl')
-        self.continuous_cols, self.categorical_cols, self.feature_names = joblib.load(f'{path_prefix}_meta.pkl')
+    # def load(self, path_prefix='cov_preprocessor'):
+    #     self.pipeline = joblib.load(f'{path_prefix}_pipeline.pkl')
+    #     self.continuous_cols, self.categorical_cols, self.feature_names = joblib.load(f'{path_prefix}_meta.pkl')

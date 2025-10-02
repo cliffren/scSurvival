@@ -175,7 +175,6 @@ class HazrdModel(nn.Module):
             self.covariate_hazard = nn.Linear(covariate_size, 1, bias=False)
             # self.raw_gamma = nn.Parameter(torch.zeros(1))
             # self.gamma_range = 0.1
-            
 
     def forward(self, h, covariates=None):
         hazard = self.hazard(h)

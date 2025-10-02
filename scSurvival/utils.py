@@ -1,6 +1,9 @@
 import torch
 import torch.utils
 from torch.utils.data import DataLoader, Dataset, TensorDataset
+import pandas as pd
+import warnings
+warnings.filterwarnings("ignore")
 
 class GPUDataLoaderv0:
     def __init__(self, data, batch_size, shuffle=True, drop_last=False):
@@ -188,3 +191,19 @@ class GPUDataLoader:
     def __len__(self):
         return len(self.index_loader)
 
+
+def make_strata_labels(y_time, y_event, n_time_bins=4):
+    """
+    use status and time to make strata labels for stratified splitting
+    - status: 0/1
+    - time: quantile binning based on rank to avoid extreme values
+    """
+    # Ensure only the patients to be divided are included; use surv.loc[patients] when calling
+    surv_df = pd.DataFrame({'time': y_time,
+                            'status': y_event})
+    times = surv_df['time']
+    # 用秩再 qcut，防止重复值导致 bin 不均
+    time_bins = pd.qcut(times.rank(method='average'), q=n_time_bins,
+                        labels=False, duplicates='drop')
+    strata = surv_df['status'].astype(int).astype(str) + "_" + time_bins.astype(int).astype(str)
+    return strata
