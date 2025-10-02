@@ -7762,6 +7762,17 @@ Added patient_hazards to surv.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>scSurvival also supports multiple feature extraction strategies to accommodate different scenarios. Users can specify the <code>feature_flavor</code> parameter: when set to 'PCA', the model uses principal components as input features for rapid analysis, and if no PCA result is available in adata.obsm, it will be computed automatically; when set to 'Custom', users can directly provide custom features stored in adata.obsm[feature_key], in which case the <code>feature_key</code> must be explicitly specified. In addition, when feature_flavor is set to 'AE', the reconstruction distribution (set by parameter <code>rec_likelihood</code>) can be chosen between 'ZIG' (Zero-inflated Gaussian) and 'G' (Gaussian), thereby retaining the advantages of the default ZIG-VAE architecture while offering more flexible options for feature modeling.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h4 id="Show-results">Show results<a class="anchor-link" href="#Show-results">¶</a></h4><h5 id="Results-for-scSurvival-patient-hazard-score-and-covariates">Results for scSurvival patient hazard score and covariates<a class="anchor-link" href="#Results-for-scSurvival-patient-hazard-score-and-covariates">¶</a></h5><p>After training, scSurvival automatically integrates both the patient-level hazard scores derived from single-cell expression data and the effects of covariates. As shown, the scSurvival-derived hazard score contributes significantly to survival prediction, while the simulated covariates show no significant association—consistent with our expectations.</p>
 </div>
 </div>
@@ -8074,9 +8085,10 @@ Added hazard and attention to adata_new.obs.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<!--- TODO: Add reference to the tutorial
-<h2 id="Reference">Reference<a class="anchor-link" href="#Reference">¶</a></h2><p>scSurvial: survival analysis from single-cell cohort data at cellular resolution.</p>
-<p>Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia</p> -->
+<!-- ## Reference
+scSurvial: survival analysis from single-cell cohort data at cellular resolution.
+
+Tao Ren, Faming Zhao, Canping Chen, Ling-Yun Wu and Zheng Xia -->
 </div>
 </div>
 </div>
