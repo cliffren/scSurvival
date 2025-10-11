@@ -411,7 +411,7 @@ class scSurvival(nn.Module):
                 h_alls = torch.cat(h_alls, dim=0).view(-1, h_alls[0].shape[0])
                 hazards = self.hazard_model(h_alls, covariates=covariates_encoded) 
 
-                atten_entropy /= len(xs)
+                atten_entropy /= len(xs_to_cox)
                 cox_loss = cox_loss_func(hazards, y_event)
 
                 if lambdas[1] == 0.0:
@@ -786,4 +786,5 @@ class CovPreprocessor:
 
     # def load(self, path_prefix='cov_preprocessor'):
     #     self.pipeline = joblib.load(f'{path_prefix}_pipeline.pkl')
+
     #     self.continuous_cols, self.categorical_cols, self.feature_names = joblib.load(f'{path_prefix}_meta.pkl')
