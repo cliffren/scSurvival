@@ -175,11 +175,12 @@ class scSurvival(nn.Module):
         if validate:
             print(f'Validation mode is enabled, will split {int(validate_ratio * 100)}% of the data for validation.')
             # straitify_labels = make_strata_labels(y_time, y_event, n_time_bins=2)
+            num_has_label = y_event.shape[0]
             straitify_labels = y_event
             try:
-                train_idx, test_idx = train_test_split(range(len(xs)), test_size=validate_ratio, random_state=42, stratify=straitify_labels, shuffle=True)
+                train_idx, test_idx = train_test_split(range(num_has_label), test_size=validate_ratio, random_state=42, stratify=straitify_labels, shuffle=True)
             except:
-                train_idx, test_idx = train_test_split(range(len(xs)), test_size=validate_ratio, random_state=42, shuffle=True)
+                train_idx, test_idx = train_test_split(range(num_has_label), test_size=validate_ratio, random_state=42, shuffle=True)
                 
             xs_train = [xs[i] for i in train_idx]
             xs_test = [xs[i] for i in test_idx]
@@ -187,6 +188,11 @@ class scSurvival(nn.Module):
             y_event_train = y_event[train_idx]
             y_time_test = y_time[test_idx]
             y_event_test = y_event[test_idx]
+
+            if len(xs) > num_has_label:
+                # means that there are some patients without survival information
+                xs_no_label = xs[num_has_label:]
+                xs_train += xs_no_label  # add the patients without survival information to the training set
 
             xs, y_time, y_event = xs_train, y_time_train, y_event_train
             if self.use_batch and batch_lists is not None:
@@ -411,7 +417,7 @@ class scSurvival(nn.Module):
                 h_alls = torch.cat(h_alls, dim=0).view(-1, h_alls[0].shape[0])
                 hazards = self.hazard_model(h_alls, covariates=covariates_encoded) 
 
-                atten_entropy /= len(xs_to_cox)
+                atten_entropy /= len(xs)
                 cox_loss = cox_loss_func(hazards, y_event)
 
                 if lambdas[1] == 0.0:
@@ -786,5 +792,4 @@ class CovPreprocessor:
 
     # def load(self, path_prefix='cov_preprocessor'):
     #     self.pipeline = joblib.load(f'{path_prefix}_pipeline.pkl')
-
     #     self.continuous_cols, self.categorical_cols, self.feature_names = joblib.load(f'{path_prefix}_meta.pkl')
