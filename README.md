@@ -122,7 +122,7 @@ If you prefer to run scSurvial directly in python, you can also download our sim
 Please cite the following publication:
 
 >scSurvival: Single-Cell Survival Analysis of Clinical Cancer Cohort Data at Cellular Resolution. Cancer Discov 2026; https://doi.org/10.1158/2159-8290.CD-25-0965
-Tao Ren, Faming Zhao, Canping Chen, Le Zhou, Ling-Yun Wu, Gordon B. Mills, Lisa M. Coussens, Zheng Xia; 
+>Tao Ren, Faming Zhao, Canping Chen, Le Zhou, Ling-Yun Wu, Gordon B. Mills, Lisa M. Coussens and Zheng Xia
 
 ## License
 scSurvival is licensed under the GNU General Public License v3.0. <br>
